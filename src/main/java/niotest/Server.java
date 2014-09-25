@@ -5,6 +5,7 @@ import java.nio.*;
 import java.nio.channels.*;
 import java.nio.channels.spi.*;
 import java.io.*;
+import java.util.*;
 
 public class Server implements Runnable {
     private final InetAddress address;
@@ -47,9 +48,30 @@ public class Server implements Runnable {
 
                 selector.select();
                 
-                for (SelectionKey key : selector.selectedKeys()) {
-                    selector.selectedKeys().remove(key);
-                    
+                Iterator<SelectionKey> it = selector.selectedKeys().iterator();
+                while(it.hasNext()) {
+                    SelectionKey key = it.next();
+                    it.remove();
+                    if (key.isAcceptable()) {
+                        System.out.println("Accepted connection by key: " + key.channel());
+                        SocketChannel cc = serverSocketChannel.accept();
+                        cc.configureBlocking(false);
+                        cc.register(selector, SelectionKey.OP_READ);
+                    } if (key.isReadable()) {
+                        SocketChannel sc = (SocketChannel)key.channel();
+                        System.out.println("Reading from channel: " + key.channel()); 
+                        ByteBuffer bb = ByteBuffer.allocate(100);
+                        int readed = sc.read(bb);
+                        System.out.println("Readed: " + readed);
+                        while (readed > 0) {
+                            
+                            System.out.print(new String(bb.array(), 0, readed));
+                            bb.clear();
+                            readed = sc.read(bb);
+                        }
+                        key.cancel();
+                        sc.close();
+                    }
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
